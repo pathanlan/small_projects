@@ -1,35 +1,55 @@
 #!/usr/bin/env python3
-# Reference - https://www.python-course.eu/os_module_shell.php
 import subprocess, time
 
+# Constant values
 speakerGUID = '04:52:C7:21:CA:4A'
-testSubprocess = subprocess.Popen(['bluetoothctl'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+connectionTimeoutPeriod = 5.0
 
-# Reference - https://stackoverflow.com/questions/4020539/process-escape-sequences-in-a-string-in-python
-line = ''
-lastChar = ''
-isReady = False
-sent = False
-while sent == False:  # lets wait for 'user' prompt
-    lastChar = testSubprocess.stdout.read(1).decode("unicode_escape")
-    line = line + lastChar
-    if isReady == True:
-        if lastChar == '#':
-            print(line)
-            commandString = "connect {}\n".format(speakerGUID)
-            print(commandString)
-            testSubprocess.stdin.write(commandString.encode())
-            testSubprocess.stdin.close()
-            isReady = False
-            print(testSubprocess.poll())
-            sent = True
-    elif lastChar == '\n':
-        line = line.rstrip('\n')
-        if line.find('Agent registered') >= 0:
-            isReady = True
-        print(line)
-        line = ''
-    #if line.find('Agent registered') >= 0:
-        # https://stackoverflow.com/questions/510348/how-can-i-make-a-time-delay-in-python
-    #    time.sleep(2)
-    #    testSubprocess.stdin.write('connect {}\n'.format(speakerGUID).encode())
+# Connect to a new instance of the "bluetoothctl" process
+bluetoothctlProcess = subprocess.Popen(['bluetoothctl'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+
+# Monitor the output from the process until we can tell it's ready
+# to receive messages, and then send a connect message
+lastCharacterReadFromProcessOutput = ''
+processReadyToReceiveMessage = False
+connectMessageSent = False
+lastFullLineReceived = ''
+while connectMessageSent == False: # Keep looping until the process is ready, and we've sent the message
+    lastCharacterReadFromProcessOutput = bluetoothctlProcess.stdout.read(1).decode("unicode_escape")
+    lastFullLineReceived = lastFullLineReceived + lastCharacterReadFromProcessOutput
+
+    if lastCharacterReadFromProcessOutput == '#' and processReadyToReceiveMessage == True:
+        connectMessage = "connect {}\n".format(speakerGUID)
+        bluetoothctlProcess.stdin.write(connectMessage.encode())
+        bluetoothctlProcess.stdin.flush()
+        connectMessageSent = True
+
+    elif lastCharacterReadFromProcessOutput == "\n":
+        lastFullLineReceived = lastFullLineReceived.rstrip("\n")
+        if lastFullLineReceived.find("Agent registered") >= 0:  # If we receive this message, the process has started and 
+                                                                # is ready to receive messages
+            processReadyToReceiveMessage = True
+        lastFullLineReceived = ''
+
+# Now we wait until the process lets us know if it was able to connect or not
+lastFullLineReceived = ''
+startTime = time.time()
+while True:
+    lastCharacterReadFromProcessOutput = bluetoothctlProcess.stdout.read(1).decode("unicode_escape")
+    lastFullLineReceived = lastFullLineReceived + lastCharacterReadFromProcessOutput
+
+    if lastCharacterReadFromProcessOutput == "\n":
+        lastFullLineReceived = lastFullLineReceived.rstrip("\n")
+        if lastFullLineReceived.find("Connection successful") >= 0:
+            print("Connected to speaker")
+            break
+        elif lastFullLineReceived.find("Failed") >= 0:
+            print("Did not connect to speaker")
+            break
+        elif (time.time() - startTime) > connectionTimeoutPeriod:
+            print("Bluetoothctl did not respond within the timeout period")
+        else:
+            lastFullLineReceived = ''
+
+bluetoothctlProcess.terminate()
+bluetoothctlProcess.wait()
