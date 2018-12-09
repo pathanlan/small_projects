@@ -4,8 +4,4 @@
 import subprocess
 
 # Reference - https://stackoverflow.com/questions/3172470/actual-meaning-of-shell-true-in-subprocess
-testSubprocess = subprocess.Popen(['bluetoothctl'])
-testSubprocess.communicate('exit')
-
-# Reference - https://stackoverflow.com/questions/4084322/killing-a-process-created-with-pythons-subprocess-popen
-testSubprocess.terminate()
+testSubprocess = subprocess.check_output(['bluetoothctl'],input=b'exit')
