@@ -66,7 +66,21 @@ print("Requested that the internet be disconnected")
 
 # Connect the internet
 wait = WebDriverWait(firefox, 5)
-wait.until(expected_conditions.element_to_be_clickable((By.XPATH,"//button[@name='Connect']")))
+try:
+    wait.until(expected_conditions.element_to_be_clickable((By.XPATH,"//button[@name='Connect']")))
+except TimeoutException as identifier:
+    # Sometimes there's a timeout, which occurs when the internet was 
+    # Disconnected cleanly/manually outside of the script, and we get the
+    # "Session not connected" page
+    print("Timeout waiting for Disconnect - Internet may have been cleanly/manually disconnected previously")
+
+    wait = WebDriverWait(firefox, 2)
+    firefox.get("http://192.168.0.1/RST_st_ppa.htm")
+    wait.until(expected_conditions.element_to_be_clickable((By.XPATH,"//button[@name='Connect']")))
+except:
+    pass
+else:
+    pass
 firefox.find_element_by_xpath("//button[@name='Connect']").send_keys(Keys.ENTER)
 print("Requested that the internet be connected")
 wait = WebDriverWait(firefox, 10)
