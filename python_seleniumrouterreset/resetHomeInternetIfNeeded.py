@@ -6,6 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 import time
+from datetime import datetime
 import sys
 
 from credentials import myRouterCredentials
@@ -47,6 +48,12 @@ if internetConnectionNeedsReset:
     print("Internet connection is bad, proceed with reset")    
 else:
     print("Internet connection is good, no need to reset")
+
+    # Write a timestamp and a zero to the stats file, representing no reset needed
+    statsFile = open("stats.csv", "w+")
+    statsFile.write("{:%Y/%m/%d %H:%M},0\r\n".format(datetime.now()))
+    statsFile.close()
+
     firefox.quit()
     sys.exit(0)
 
@@ -77,10 +84,7 @@ except TimeoutException as identifier:
     wait = WebDriverWait(firefox, 2)
     firefox.get("http://192.168.0.1/RST_st_ppa.htm")
     wait.until(expected_conditions.element_to_be_clickable((By.XPATH,"//button[@name='Connect']")))
-except:
-    pass
-else:
-    pass
+
 firefox.find_element_by_xpath("//button[@name='Connect']").send_keys(Keys.ENTER)
 print("Requested that the internet be connected")
 wait = WebDriverWait(firefox, 10)
@@ -96,6 +100,13 @@ statusTextSpan = firefox.find_element_by_xpath("//td[@id='internet1']/span[2]")
 internetConnectionIsGood = str.upper(statusTextSpan.text) == "GOOD"
 if internetConnectionIsGood:
     print("Internet connection is good, reset succesful")
+
+    # Write a timestamp and a one to the stats file, representing a reset needed
+    # and done successfully
+    statsFile = open("stats.csv", "w+")
+    statsFile.write("{:%Y/%m/%d %H:%M},1\r\n".format(datetime.now()))
+    statsFile.close()
+
     firefox.quit()
     sys.exit(0)
 else:
