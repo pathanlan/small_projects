@@ -87,7 +87,7 @@ except TimeoutException as identifier:
 
 firefox.find_element_by_xpath("//button[@name='Connect']").send_keys(Keys.ENTER)
 print("Requested that the internet be connected")
-wait = WebDriverWait(firefox, 10)
+wait = WebDriverWait(firefox, 15)
 wait.until(expected_conditions.url_matches("http://192.168.0.1/RST_st_ppa.htm"))
 
 # Verify the internet is connected
