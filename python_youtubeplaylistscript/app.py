@@ -65,7 +65,7 @@ def oauth_callback_get():
     # Order the items in the list by upload date ascending
     allItems.sort(key = lambda anItem: anItem["timestamp"])
 
-    # Detect if the target playlist exists. If it does, delete it.
+    # Detect if the target playlist exists. If it does, remove all items from it.
     targetPlaylistName = str.format("Test Playlist (Ordered Copy)")
 
     pageToken = ''
@@ -89,19 +89,40 @@ def oauth_callback_get():
             break
 
     if len(targetPlaylistId) > 0:
-        youtubeAPI.playlists().delete(
-            id = targetPlaylistId
+        itemsInExistingPlaylist = []
+        pageToken = ''
+        while True:        
+            response = youtubeAPI.playlistItems().list(
+                part='id', 
+                playlistId=targetPlaylistId,
+                maxResults=50,
+                pageToken=pageToken
+            ).execute()
+
+            for anItem in response['items']:
+                itemsInExistingPlaylist.append(dict(id = anItem["id"]))
+
+            if 'nextPageToken' in response:
+                pageToken = response['nextPageToken']
+            else:
+                break
+        
+        for anItem in itemsInExistingPlaylist:
+            youtubeAPI.playlistItems().delete(
+                id = anItem["id"]
+            ).execute()
+    else:
+        # Create the target playlist
+        createdPlaylistResponse = youtubeAPI.playlists().insert(
+            part = 'snippet',
+            body = dict(
+                snippet = dict(
+                    title = targetPlaylistName
+                )
+            )
         ).execute()
 
-    # Create the target playlist
-    createdPlaylistResponse = youtubeAPI.playlists().insert(
-        part = 'snippet',
-        body = dict(
-            snippet = dict(
-                title = targetPlaylistName
-            )
-        )
-    ).execute()
+        targetPlaylistId = createdPlaylistResponse["id"]
 
     # Add all the items to the target playlist
     for anItem in allItems:
@@ -109,13 +130,13 @@ def oauth_callback_get():
             part = 'snippet',
             body = dict(
                 snippet = dict(
-                    playlistId = createdPlaylistResponse["id"],
+                    playlistId = targetPlaylistId,
                     resourceId = anItem["resourceId"]
                 )
             )
         ).execute()
 
-    return redirect(str.format("https://www.youtube.com/playlist?list={}", createdPlaylistResponse["id"]))
+    return redirect(str.format("https://www.youtube.com/playlist?list={}", targetPlaylistId))
     
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')
