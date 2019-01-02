@@ -5,6 +5,8 @@ import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
 import json
 
+import iso8601
+
 app = Flask(__name__)
 
 # Use the client_secret.json file to identify the application requesting
@@ -51,28 +53,69 @@ def oauth_callback_get():
 
         for anItem in response['items']:
             newItem = {}
-            newItem["id"] = anItem["id"]
-            newItem["timestamp"] = anItem["snippet"]["publishedAt"]
+            newItem["resourceId"] = anItem["snippet"]["resourceId"]
+            newItem["timestamp"] = iso8601.parse_date(anItem["snippet"]["publishedAt"])
             allItems.append(newItem)
 
         if 'nextPageToken' in response:
             pageToken = response['nextPageToken']
         else:
             break
-
-    itemTable = "<table><tr><td>Id</td><td>Timestamp</td></tr>"
-    for anItem in allItems:
-        itemTable = str.format("{}<tr><td>{}</td><td>{}</td></tr>", itemTable, anItem["id"], anItem["timestamp"])
-    itemTable = str.format("{}</table>", itemTable)
-
-    return str.format("Item count: {}<br>Done<br>Go again: <a href = '/'>Do it!</a><br><br>{}",
-        len(allItems), itemTable)
-
+    
     # Order the items in the list by upload date ascending
-    # Create (if not exists) or clear (if exists) a playlist in my account to
-    #    add all the items to
-    # Add all the items to the target playlist
-    # Profit.
+    allItems.sort(key = lambda anItem: anItem["timestamp"])
 
+    # Detect if the target playlist exists. If it does, delete it.
+    targetPlaylistName = str.format("Test Playlist (Ordered Copy)")
+
+    pageToken = ''
+    targetPlaylistId = ''
+    while True:
+        response = youtubeAPI.playlists().list(
+            part='snippet', 
+            mine=True,
+            maxResults=50,
+            pageToken=pageToken
+        ).execute()
+
+        for aPlaylist in response['items']:
+            if aPlaylist["snippet"]["title"].find(targetPlaylistName) != -1:
+                targetPlaylistId = aPlaylist["id"]
+                break
+
+        if 'nextPageToken' in response:
+            pageToken = response['nextPageToken']
+        else:
+            break
+
+    if len(targetPlaylistId) > 0:
+        youtubeAPI.playlists().delete(
+            id = targetPlaylistId
+        ).execute()
+
+    # Create the target playlist
+    createdPlaylistResponse = youtubeAPI.playlists().insert(
+        part = 'snippet',
+        body = dict(
+            snippet = dict(
+                title = targetPlaylistName
+            )
+        )
+    ).execute()
+
+    # Add all the items to the target playlist
+    for anItem in allItems:
+        youtubeAPI.playlistItems().insert(
+            part = 'snippet',
+            body = dict(
+                snippet = dict(
+                    playlistId = createdPlaylistResponse["id"],
+                    resourceId = anItem["resourceId"]
+                )
+            )
+        ).execute()
+
+    return redirect(str.format("https://www.youtube.com/playlist?list={}", createdPlaylistResponse["id"]))
+    
 if __name__ == "__main__":
     app.run(ssl_context='adhoc')
