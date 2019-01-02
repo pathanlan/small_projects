@@ -1,19 +1,39 @@
-import json
-from requests_oauthlib import OAuth2Session
+# Using: https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps
 
-auth_url = 'https://accounts.google.com/o/oauth2/auth'
-token_url = 'https://www.googleapis.com/oauth2/v3/token'
-client_id = r'36353489037-lquttng6c2r2pr9rlr5hgmcfk0ehh9e3.apps.googleusercontent.com'
-client_secret = r'lmsDFVcn81_ezKq0BDuNqpcq'
-redirect_uri = 'http://localhost'
-scope = ['https://www.googleapis.com/auth/youtube']
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+from googleapiclient.discovery import build
 
-oauth = OAuth2Session(client_id, redirect_uri=redirect_uri, scope=scope)
-manual_auth_url, state = oauth.authorization_url(auth_url, access_type = "offline", prompt = "select_account")
+# Use the client_secret.json file to identify the application requesting
+# authorization. The client ID (from that file) and access scopes are required.
+flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+    'client_secret.json',
+    scopes=['https://www.googleapis.com/auth/youtube.force-ssl'])
 
-print('Please go to >> ', manual_auth_url, ' << and authorize access.')
-authorization_response = input('Enter the full callback URL')
+# Indicate where the API server will redirect the user after the user completes
+# the authorization flow. The redirect URI is required.
+flow.redirect_uri = 'https://localhost'
 
-token = oauth.fetch_token(token_url, authorization_response=authorization_response, client_secret=client_secret)
+# Generate URL for request to Google's OAuth 2.0 server.
+# Use kwargs to set optional request parameters.
+authorization_url, state = flow.authorization_url(
+    # Enable offline access so that you can refresh an access token without
+    # re-prompting the user for permission. Recommended for web server apps.
+    access_type='offline',
+    # Enable incremental authorization. Recommended as a best practice.
+    include_granted_scopes='true')
 
-# Continue - https://requests-oauthlib.readthedocs.io/en/latest/oauth2_workflow.html#web-application-flow
+print("Go to the auth url to authorise the script: ", authorization_url)
+callback_url = input("Please copy and paste the response callback url: ")
+
+flow.fetch_token(authorization_response=callback_url)
+credentials = flow.credentials
+
+youtubeAPI = build('youtube','v3', credentials=credentials)
+videos = youtubeAPI.playlistItems().list(
+    part='snippet', 
+    playlistId='PL3Z0xw5JKEcmg0dLCQDa7LvbzlZGPLqaV',
+    maxResults=50
+).execute()
+
+print(videos)
