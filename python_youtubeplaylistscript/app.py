@@ -1,6 +1,5 @@
 # Using: https://developers.google.com/youtube/v3/guides/auth/server-side-web-apps
-
-from flask import Flask, request
+from flask import Flask, request, redirect
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
@@ -29,7 +28,7 @@ def index_get():
         # Enable incremental authorization. Recommended as a best practice.
         include_granted_scopes='true')
 
-    return "Go to the auth url to authorise the script: >> <a href = \"" + authorization_url + "\">Auth URL</a>"
+    return redirect(authorization_url)
 
 @app.route('/oauth_callback')
 def oauth_callback_get():
@@ -39,15 +38,35 @@ def oauth_callback_get():
 
     # Get all items from the playlist, and add to an array/list
     youtubeAPI = build('youtube','v3', credentials=credentials)
-    response = youtubeAPI.playlistItems().list(
-        part='snippet', 
-        playlistId='PL3Z0xw5JKEcmg0dLCQDa7LvbzlZGPLqaV',
-        maxResults=50,
-        pageToken=""
-    ).execute()
 
-    return str.format("Item count: {}<br>Done<br>Go again: <a href = '/'>Do it!</a>",
-        len(response.items()))
+    pageToken = ''
+    allItems = []
+    while True:        
+        response = youtubeAPI.playlistItems().list(
+            part='snippet', 
+            playlistId='PL3Z0xw5JKEcmg0dLCQDa7LvbzlZGPLqaV',
+            maxResults=50,
+            pageToken=pageToken
+        ).execute()
+
+        for anItem in response['items']:
+            newItem = {}
+            newItem["id"] = anItem["id"]
+            newItem["timestamp"] = anItem["snippet"]["publishedAt"]
+            allItems.append(newItem)
+
+        if 'nextPageToken' in response:
+            pageToken = response['nextPageToken']
+        else:
+            break
+
+    itemTable = "<table><tr><td>Id</td><td>Timestamp</td></tr>"
+    for anItem in allItems:
+        itemTable = str.format("{}<tr><td>{}</td><td>{}</td></tr>", itemTable, anItem["id"], anItem["timestamp"])
+    itemTable = str.format("{}</table>", itemTable)
+
+    return str.format("Item count: {}<br>Done<br>Go again: <a href = '/'>Do it!</a><br><br>{}",
+        len(allItems), itemTable)
 
     # Order the items in the list by upload date ascending
     # Create (if not exists) or clear (if exists) a playlist in my account to
