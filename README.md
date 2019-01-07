@@ -1,2 +1,3 @@
-# small_projects
-Small projects for testing things, trying out new things, and starting new projects off
+# Small Projects
+_Small projects or scripts, for learning, kicking off new project ideas, or when a seperate repo isn't needed_
+---
