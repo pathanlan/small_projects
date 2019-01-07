@@ -87,14 +87,21 @@ except TimeoutException as identifier:
 
 firefox.find_element_by_xpath("//button[@name='Connect']").send_keys(Keys.ENTER)
 print("Requested that the internet be connected")
-wait = WebDriverWait(firefox, 15)
-wait.until(expected_conditions.url_matches("http://192.168.0.1/RST_st_ppa.htm"))
+
+statusPageRetryCount = 0
+while statusPageRetryCount < 3:
+    try:
+        wait = WebDriverWait(firefox, 5)
+        wait.until(expected_conditions.url_matches("http://192.168.0.1/RST_st_ppa.htm"))
+        break
+    except TimeoutException as identifier:
+        statusPageRetryCount = statusPageRetryCount + 1
 
 # Verify the internet is connected
 firefox.get("http://192.168.0.1/start.htm")
 wait = WebDriverWait(firefox, 2)
 wait.until(expected_conditions.frame_to_be_available_and_switch_to_it((By.XPATH,"//iframe[@id='page']")))
-wait = WebDriverWait(firefox, 5)
+wait = WebDriverWait(firefox, 10)
 wait.until(expected_conditions.presence_of_element_located((By.XPATH, "//td[@id='internet1']/span[2]")))
 statusTextSpan = firefox.find_element_by_xpath("//td[@id='internet1']/span[2]")
 internetConnectionIsGood = str.upper(statusTextSpan.text) == "GOOD"
